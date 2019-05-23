@@ -31,8 +31,8 @@ class commonPipelineEnvironment implements Serializable {
     Map containerProperties = [:]
     Map defaultConfiguration = [:]
 
+    String mtarFilePath = ""
 
-    String mtarFilePath
     private Map valueMap = [:]
 
     void setValue(String property, value) {
