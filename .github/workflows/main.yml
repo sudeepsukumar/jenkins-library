@@ -1,0 +1,15 @@
+name: Run Tests
+on: [push]
+
+jobs:
+  build:
+    name: Piper NG Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - name: Run tests
+        run: docker build -t piper:latest .
