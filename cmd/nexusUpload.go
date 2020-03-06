@@ -25,29 +25,35 @@ type projectStructure interface {
 	UsesNpm() bool
 }
 
-type mavenExecutor interface {
-	Execute(options *maven.ExecuteOptions, execRunner command.Command) (string, error)
+type mavenExecutor struct {
+	execRunner command.Command
+}
+
+type mavenEvaluator interface {
+	evaluateProperty(pomFile, expression string) (string, error)
 }
 
 func nexusUpload(options nexusUploadOptions, telemetryData *telemetry.CustomData) {
 	uploader := nexus.Upload{Username: options.User, Password: options.Password}
 	projectStructure := piperutils.ProjectStructure{}
 	fileUtils := piperutils.Files{}
+	evaluator := mavenExecutor{execRunner: command.Command{}}
 
-	err := runNexusUpload(&options, &uploader, &projectStructure, &fileUtils, telemetryData)
+	err := runNexusUpload(&options, &uploader, &projectStructure, &fileUtils, &evaluator, telemetryData)
 	if err != nil {
 		log.Entry().WithError(err).Fatal("step execution failed")
 	}
 }
 
-func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, projectStructure projectStructure, fileUtils piperutils.FileUtils, telemetryData *telemetry.CustomData) error {
+func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, projectStructure projectStructure,
+	fileUtils piperutils.FileUtils, evaluator mavenEvaluator, telemetryData *telemetry.CustomData) error {
 
 	if projectStructure.UsesMta() {
 		log.Entry().Info("MTA project structure detected")
 		return uploadMTA(uploader, fileUtils, options)
 	} else if projectStructure.UsesMaven() {
 		log.Entry().Info("Maven project structure detected")
-		return uploadMaven(uploader, fileUtils, options)
+		return uploadMaven(uploader, fileUtils, evaluator, options)
 	} else {
 		return fmt.Errorf("unsupported project structure")
 	}
@@ -111,8 +117,10 @@ func setVersionFromMtaYaml(uploader nexus.Uploader, mtaYamlContent []byte) error
 
 var errPomNotFound error = errors.New("pom.xml not found")
 
-func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options *nexusUploadOptions) error {
-	err := uploadMavenArtifacts(uploader, fileUtils, options, "", "target", "")
+func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, evaluator mavenEvaluator,
+	options *nexusUploadOptions) error {
+	err := uploadMavenArtifacts(uploader, fileUtils, evaluator, options,
+		"", "target", "")
 	if err != nil {
 		return err
 	}
@@ -120,7 +128,8 @@ func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, option
 	// Test if a sub-folder "application" exists and upload the artifacts from there as well.
 	// This means there are built-in assumptions about the project structure (archetype),
 	// that nexusUpload supports. To make this more flexible should be the scope of another PR.
-	err = uploadMavenArtifacts(uploader, fileUtils, options, "application", "application/target", options.AdditionalClassifiers)
+	err = uploadMavenArtifacts(uploader, fileUtils, evaluator, options,
+		"application", "application/target", options.AdditionalClassifiers)
 	if err == errPomNotFound {
 		// Ignore for missing application module
 		return nil
@@ -128,7 +137,8 @@ func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, option
 	return err
 }
 
-func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options *nexusUploadOptions, pomPath, targetFolder, additionalClassifiers string) error {
+func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtils, evaluator mavenEvaluator,
+	options *nexusUploadOptions, pomPath, targetFolder, additionalClassifiers string) error {
 	var err error
 
 	pomFile := composeFilePath(pomPath, "pom", "xml")
@@ -136,7 +146,7 @@ func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtil
 	if !exists {
 		return errPomNotFound
 	}
-	groupID, err := evaluateMavenProperty(pomFile, "project.groupId")
+	groupID, err := evaluator.evaluateProperty(pomFile, "project.groupId")
 	if groupID == "" {
 		groupID = options.GroupID
 		// Reset error
@@ -147,11 +157,11 @@ func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtil
 	}
 	var artifactID string
 	if err == nil {
-		artifactID, err = evaluateMavenProperty(pomFile, "project.artifactId")
+		artifactID, err = evaluator.evaluateProperty(pomFile, "project.artifactId")
 	}
 	var artifactsVersion string
 	if err == nil {
-		artifactsVersion, err = evaluateMavenProperty(pomFile, "project.version")
+		artifactsVersion, err = evaluator.evaluateProperty(pomFile, "project.version")
 	}
 	if err == nil {
 		err = uploader.SetArtifactsVersion(artifactsVersion)
@@ -166,7 +176,7 @@ func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtil
 		err = uploader.AddArtifact(artifact)
 	}
 	if err == nil {
-		err = addTargetArtifact(pomFile, targetFolder, artifactID, uploader)
+		err = addTargetArtifact(pomFile, targetFolder, artifactID, uploader, evaluator)
 	}
 	if err == nil {
 		err = addAdditionalClassifierArtifacts(additionalClassifiers, targetFolder, artifactID, uploader)
@@ -177,8 +187,8 @@ func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtil
 	return err
 }
 
-func addTargetArtifact(pomFile, targetFolder, artifactID string, uploader nexus.Uploader) error {
-	packaging, err := evaluateMavenProperty(pomFile, "project.packaging")
+func addTargetArtifact(pomFile, targetFolder, artifactID string, uploader nexus.Uploader, evaluator mavenEvaluator) error {
+	packaging, err := evaluator.evaluateProperty(pomFile, "project.packaging")
 	if err != nil {
 		return err
 	}
@@ -189,7 +199,7 @@ func addTargetArtifact(pomFile, targetFolder, artifactID string, uploader nexus.
 	if packaging == "" {
 		packaging = "jar"
 	}
-	finalName, err := evaluateMavenProperty(pomFile, "project.build.finalName")
+	finalName, err := evaluator.evaluateProperty(pomFile, "project.build.finalName")
 	if err != nil || finalName == "" {
 		// NOTE: The error should be ignored, and the finalName built as Maven would from artifactId and so on.
 		// But it seems this expression always resolves, even if finalName is nowhere declared in the pom.xml
@@ -238,10 +248,9 @@ func composeFilePath(folder, name, extension string) string {
 	return filepath.Join(folder, fileName)
 }
 
-func evaluateMavenProperty(pomFile, expression string) (string, error) {
-	execRunner := command.Command{}
-	execRunner.Stdout(ioutil.Discard)
-	execRunner.Stderr(ioutil.Discard)
+func (m *mavenExecutor) evaluateProperty(pomFile, expression string) (string, error) {
+	m.execRunner.Stdout(ioutil.Discard)
+	m.execRunner.Stderr(ioutil.Discard)
 
 	expressionDefine := "-Dexpression=" + expression
 
@@ -251,7 +260,7 @@ func evaluateMavenProperty(pomFile, expression string) (string, error) {
 		Defines:      []string{expressionDefine, "-DforceStdout", "-q"},
 		ReturnStdout: true,
 	}
-	value, err := maven.Execute(&options, &execRunner)
+	value, err := maven.Execute(&options, &m.execRunner)
 	if err != nil {
 		return "", err
 	}
