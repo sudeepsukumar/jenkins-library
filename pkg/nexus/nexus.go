@@ -18,8 +18,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ArtifactDescription describes a single artifact that can be uploaded to a Nexus repository manager. The File string
-// must point to an existing file. The Classifier can be empty.
+// ArtifactDescription describes a single artifact that can be uploaded to a Nexus repository manager.
+// The File string must point to an existing file. The Classifier can be empty.
 type ArtifactDescription struct {
 	ID         string `json:"artifactId"`
 	Classifier string `json:"classifier"`
@@ -27,8 +27,8 @@ type ArtifactDescription struct {
 	File       string `json:"file"`
 }
 
-// Upload holds state for an upload session. Call SetBaseURL(), SetArtifactsVersion() and add at least one artifact via
-// AddArtifact(). Then call UploadArtifacts().
+// Upload holds state for an upload session. Call SetBaseURL(), SetArtifactsVersion() and add at least
+// one artifact via AddArtifact(). Then call UploadArtifacts().
 type Upload struct {
 	baseURL   string
 	version   string
@@ -38,7 +38,8 @@ type Upload struct {
 	Logger    *logrus.Entry
 }
 
-// Uploader provides an interface to the nexus upload for configuring the target Nexus Repository and adding artifacts.
+// Uploader provides an interface to the nexus upload for configuring the target Nexus Repository and
+// adding artifacts.
 type Uploader interface {
 	SetBaseURL(nexusURL, nexusVersion, repository, groupID string) error
 	SetArtifactsVersion(version string) error
@@ -76,8 +77,8 @@ func (nexusUpload *Upload) SetBaseURL(nexusURL, nexusVersion, repository, groupI
 	return nil
 }
 
-// SetArtifactsVersion sets the common version for all uploaded artifacts. The version is external to the artifact
-// descriptions so that it is consistent for all of them.
+// SetArtifactsVersion sets the common version for all uploaded artifacts. The version is external to
+// the artifact descriptions so that it is consistent for all of them.
 func (nexusUpload *Upload) SetArtifactsVersion(version string) error {
 	if version == "" {
 		return errors.New("version must not be empty")
@@ -86,7 +87,8 @@ func (nexusUpload *Upload) SetArtifactsVersion(version string) error {
 	return nil
 }
 
-// AddArtifact adds a single artifact to the Upload.
+// AddArtifact adds a single artifact to be uploaded later via UploadArtifacts(). If an identical artifact
+// description is already contained in the Upload, the function does nothing and returns no error.
 func (nexusUpload *Upload) AddArtifact(artifact ArtifactDescription) error {
 	err := validateArtifact(artifact)
 	if err != nil {
@@ -102,7 +104,8 @@ func (nexusUpload *Upload) AddArtifact(artifact ArtifactDescription) error {
 
 func validateArtifact(artifact ArtifactDescription) error {
 	if artifact.File == "" || artifact.ID == "" || artifact.Type == "" {
-		return fmt.Errorf("Artifact.File (%v), ID (%v) or Type (%v) is empty", artifact.File, artifact.ID, artifact.Type)
+		return fmt.Errorf("Artifact.File (%v), ID (%v) or Type (%v) is empty",
+			artifact.File, artifact.ID, artifact.Type)
 	}
 	return nil
 }
@@ -148,8 +151,7 @@ func (nexusUpload *Upload) GetArtifacts() []ArtifactDescription {
 	return artifacts
 }
 
-// UploadArtifacts performs the actual upload to Nexus. If any error occurs, the program will currently exit via
-// the logger.
+// UploadArtifacts performs the actual upload of all added artifacts to the Nexus server.
 func (nexusUpload *Upload) UploadArtifacts() error {
 	client := nexusUpload.createHTTPClient()
 	return nexusUpload.uploadArtifacts(client)
@@ -193,7 +195,11 @@ func (nexusUpload *Upload) uploadArtifacts(client piperHttp.Sender) error {
 
 func (nexusUpload *Upload) createHTTPClient() *piperHttp.Client {
 	client := piperHttp.Client{}
-	clientOptions := piperHttp.ClientOptions{Username: nexusUpload.Username, Password: nexusUpload.Password, Logger: nexusUpload.Logger}
+	clientOptions := piperHttp.ClientOptions{
+		Username: nexusUpload.Username,
+		Password: nexusUpload.Password,
+		Logger:   nexusUpload.Logger,
+	}
 	client.SetOptions(clientOptions)
 	return &client
 }
