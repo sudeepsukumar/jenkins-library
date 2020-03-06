@@ -40,10 +40,6 @@ void call(Map parameters = [:]) {
 
         writeFile(file: METADATA_FILE, text: libraryResource(METADATA_FILE))
 
-        // Replace 'artifacts' List with JSON encoded String
-        if (parameters.artifacts) {
-            parameters.artifacts = "${toJson(parameters.artifacts as List)}"
-        }
         // Replace 'additionalClassifiers' List with JSON encoded String
         if (parameters.additionalClassifiers) {
             parameters.additionalClassifiers = "${toJson(parameters.additionalClassifiers as List)}"
