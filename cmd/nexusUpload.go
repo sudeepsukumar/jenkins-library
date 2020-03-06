@@ -20,17 +20,23 @@ import (
 	"github.com/ghodss/yaml"
 )
 
+type projectStructure interface {
+	UsesMta() bool
+	UsesMaven() bool
+	UsesNpm() bool
+}
+
 func nexusUpload(options nexusUploadOptions, telemetryData *telemetry.CustomData) {
 	uploader := nexus.Upload{Username: options.User, Password: options.Password}
+	projectStructure := piperutils.ProjectStructure{}
 
-	err := runNexusUpload(&options, &uploader, telemetryData)
+	err := runNexusUpload(&options, &uploader, &projectStructure, telemetryData)
 	if err != nil {
 		log.Entry().WithError(err).Fatal("step execution failed")
 	}
 }
 
-func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, telemetryData *telemetry.CustomData) error {
-	projectStructure := piperutils.ProjectStructure{}
+func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, projectStructure projectStructure, telemetryData *telemetry.CustomData) error {
 
 	if projectStructure.UsesMta() {
 		log.Entry().Info("MTA project structure detected")
