@@ -27,13 +27,34 @@ func TestAdditionalClassifierInvalidJSON(t *testing.T) {
 }
 
 func TestAdditionalClassifierValidButWrongJSON(t *testing.T) {
-	client, err := testAdditionalClassifierArtifacts("[{\"classifier\":\"source\",\"type\":\"jar\"},{}]")
+	json := `
+		[
+			{
+				"classifier" : "source",
+				"type"       : "jar"
+			},
+			{}
+		]
+	`
+	client, err := testAdditionalClassifierArtifacts(json)
 	assert.Error(t, err, "expected invalid additional classifiers to fail")
 	assert.True(t, len(client.GetArtifacts()) == 1)
 }
 
 func TestAdditionalClassifierValidJSON(t *testing.T) {
-	client, err := testAdditionalClassifierArtifacts("[{\"classifier\":\"source\",\"type\":\"jar\"},{\"classifier\":\"classes\",\"type\":\"jar\"}]")
+	json := `
+		[
+			{
+				"classifier" : "source",
+				"type"       : "jar"
+			},
+			{
+				"classifier" : "classes",
+				"type"       : "jar"
+			}
+		]
+	`
+	client, err := testAdditionalClassifierArtifacts(json)
 	assert.NoError(t, err, "expected valid additional classifiers to succeed")
 	assert.True(t, len(client.GetArtifacts()) == 2)
 }

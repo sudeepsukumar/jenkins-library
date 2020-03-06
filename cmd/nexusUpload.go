@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -26,30 +25,35 @@ type projectStructure interface {
 	UsesNpm() bool
 }
 
+type mavenExecutor interface {
+	Execute(options *maven.ExecuteOptions, execRunner command.Command) (string, error)
+}
+
 func nexusUpload(options nexusUploadOptions, telemetryData *telemetry.CustomData) {
 	uploader := nexus.Upload{Username: options.User, Password: options.Password}
 	projectStructure := piperutils.ProjectStructure{}
+	fileUtils := piperutils.Files{}
 
-	err := runNexusUpload(&options, &uploader, &projectStructure, telemetryData)
+	err := runNexusUpload(&options, &uploader, &projectStructure, &fileUtils, telemetryData)
 	if err != nil {
 		log.Entry().WithError(err).Fatal("step execution failed")
 	}
 }
 
-func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, projectStructure projectStructure, telemetryData *telemetry.CustomData) error {
+func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, projectStructure projectStructure, fileUtils piperutils.FileUtils, telemetryData *telemetry.CustomData) error {
 
 	if projectStructure.UsesMta() {
 		log.Entry().Info("MTA project structure detected")
-		return uploadMTA(uploader, options)
+		return uploadMTA(uploader, fileUtils, options)
 	} else if projectStructure.UsesMaven() {
 		log.Entry().Info("Maven project structure detected")
-		return uploadMaven(uploader, options)
+		return uploadMaven(uploader, fileUtils, options)
 	} else {
 		return fmt.Errorf("unsupported project structure")
 	}
 }
 
-func uploadMTA(uploader nexus.Uploader, options *nexusUploadOptions) error {
+func uploadMTA(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options *nexusUploadOptions) error {
 	if options.GroupID == "" {
 		return fmt.Errorf("the 'groupID' parameter needs to be provided for MTA projects")
 	}
@@ -59,10 +63,10 @@ func uploadMTA(uploader nexus.Uploader, options *nexusUploadOptions) error {
 		if exists {
 			// Give this file precedence, but it would be even better if
 			// ProjectStructure could be asked for the mta file it detected.
-			err = setVersionFromMtaFile(uploader, "mta.yaml")
+			err = setVersionFromMtaFile(uploader, fileUtils, "mta.yaml")
 		} else {
 			// This will fail anyway if the file doesn't exist
-			err = setVersionFromMtaFile(uploader, "mta.yml")
+			err = setVersionFromMtaFile(uploader, fileUtils, "mta.yml")
 		}
 	}
 	if err == nil {
@@ -88,8 +92,8 @@ type mtaYaml struct {
 	Version string `json:"version"`
 }
 
-func setVersionFromMtaFile(uploader nexus.Uploader, filePath string) error {
-	mtaYamlContent, err := ioutil.ReadFile(filePath)
+func setVersionFromMtaFile(uploader nexus.Uploader, fileUtils piperutils.FileUtils, filePath string) error {
+	mtaYamlContent, err := fileUtils.FileRead(filePath)
 	if err != nil {
 		return err
 	}
@@ -107,8 +111,8 @@ func setVersionFromMtaYaml(uploader nexus.Uploader, mtaYamlContent []byte) error
 
 var errPomNotFound error = errors.New("pom.xml not found")
 
-func uploadMaven(uploader nexus.Uploader, options *nexusUploadOptions) error {
-	err := uploadMavenArtifacts(uploader, options, "", "target", "")
+func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options *nexusUploadOptions) error {
+	err := uploadMavenArtifacts(uploader, fileUtils, options, "", "target", "")
 	if err != nil {
 		return err
 	}
@@ -116,7 +120,7 @@ func uploadMaven(uploader nexus.Uploader, options *nexusUploadOptions) error {
 	// Test if a sub-folder "application" exists and upload the artifacts from there as well.
 	// This means there are built-in assumptions about the project structure (archetype),
 	// that nexusUpload supports. To make this more flexible should be the scope of another PR.
-	err = uploadMavenArtifacts(uploader, options, "application", "application/target", options.AdditionalClassifiers)
+	err = uploadMavenArtifacts(uploader, fileUtils, options, "application", "application/target", options.AdditionalClassifiers)
 	if err == errPomNotFound {
 		// Ignore for missing application module
 		return nil
@@ -124,12 +128,12 @@ func uploadMaven(uploader nexus.Uploader, options *nexusUploadOptions) error {
 	return err
 }
 
-func uploadMavenArtifacts(uploader nexus.Uploader, options *nexusUploadOptions, pomPath, targetFolder, additionalClassifiers string) error {
+func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options *nexusUploadOptions, pomPath, targetFolder, additionalClassifiers string) error {
 	var err error
 
 	pomFile := composeFilePath(pomPath, "pom", "xml")
-	stat, err := os.Stat(pomFile)
-	if err != nil || stat.IsDir() {
+	exists, _ := fileUtils.FileExists(pomFile)
+	if !exists {
 		return errPomNotFound
 	}
 	groupID, err := evaluateMavenProperty(pomFile, "project.groupId")
