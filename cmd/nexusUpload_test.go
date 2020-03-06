@@ -15,19 +15,18 @@ func TestMavenEvaluateGroupID(t *testing.T) {
 }
 
 func TestAdditionalClassifierEmpty(t *testing.T) {
-	client, err := testAdditionalClassifierArtifacts("")
-	assert.NoError(t, err, "expected empty additional classifiers to succeed")
-	assert.True(t, len(client.GetArtifacts()) == 0)
-}
-
-func TestAdditionalClassifierInvalidJSON(t *testing.T) {
-	client, err := testAdditionalClassifierArtifacts("some random string")
-	assert.Error(t, err, "expected invalid additional classifiers to fail")
-	assert.True(t, len(client.GetArtifacts()) == 0)
-}
-
-func TestAdditionalClassifierValidButWrongJSON(t *testing.T) {
-	json := `
+	t.Run("Empty additional classifiers", func(t *testing.T) {
+		client, err := testAdditionalClassifierArtifacts("")
+		assert.NoError(t, err, "expected empty additional classifiers to succeed")
+		assert.True(t, len(client.GetArtifacts()) == 0)
+	})
+	t.Run("Additional classifiers is invalid JSON", func(t *testing.T) {
+		client, err := testAdditionalClassifierArtifacts("some random string")
+		assert.Error(t, err, "expected invalid additional classifiers to fail")
+		assert.True(t, len(client.GetArtifacts()) == 0)
+	})
+	t.Run("Classifiers valid but wrong JSON", func(t *testing.T) {
+		json := `
 		[
 			{
 				"classifier" : "source",
@@ -36,13 +35,12 @@ func TestAdditionalClassifierValidButWrongJSON(t *testing.T) {
 			{}
 		]
 	`
-	client, err := testAdditionalClassifierArtifacts(json)
-	assert.Error(t, err, "expected invalid additional classifiers to fail")
-	assert.True(t, len(client.GetArtifacts()) == 1)
-}
-
-func TestAdditionalClassifierValidJSON(t *testing.T) {
-	json := `
+		client, err := testAdditionalClassifierArtifacts(json)
+		assert.Error(t, err, "expected invalid additional classifiers to fail")
+		assert.True(t, len(client.GetArtifacts()) == 1)
+	})
+	t.Run("Additional classifiers is valid JSON", func(t *testing.T) {
+		json := `
 		[
 			{
 				"classifier" : "source",
@@ -54,9 +52,10 @@ func TestAdditionalClassifierValidJSON(t *testing.T) {
 			}
 		]
 	`
-	client, err := testAdditionalClassifierArtifacts(json)
-	assert.NoError(t, err, "expected valid additional classifiers to succeed")
-	assert.True(t, len(client.GetArtifacts()) == 2)
+		client, err := testAdditionalClassifierArtifacts(json)
+		assert.NoError(t, err, "expected valid additional classifiers to succeed")
+		assert.True(t, len(client.GetArtifacts()) == 2)
+	})
 }
 
 func testAdditionalClassifierArtifacts(additionalClassifiers string) (*nexus.Upload, error) {
