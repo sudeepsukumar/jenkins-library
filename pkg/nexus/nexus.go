@@ -55,15 +55,6 @@ func (nexusUpload *Upload) initLogger() {
 
 // SetBaseURL constructs the base URL for all uploaded artifacts. No parameter can be empty.
 func (nexusUpload *Upload) SetBaseURL(nexusURL, nexusVersion, repository, groupID string) error {
-	if nexusURL == "" {
-		return errors.New("nexusURL must not be empty")
-	}
-	if repository == "" {
-		return errors.New("repository must not be empty")
-	}
-	if groupID == "" {
-		return errors.New("groupID must not be empty")
-	}
 	baseURL, err := getBaseURL(nexusURL, nexusVersion, repository, groupID)
 	if err != nil {
 		return err
@@ -102,6 +93,9 @@ func validateArtifact(artifact ArtifactDescription) error {
 		return fmt.Errorf("Artifact.File (%v), ID (%v) or Type (%v) is empty",
 			artifact.File, artifact.ID, artifact.Type)
 	}
+	if strings.Contains(artifact.ID, "/") {
+		return fmt.Errorf("Artifact.ID may not include slashes")
+	}
 	return nil
 }
 
@@ -135,7 +129,7 @@ func (nexusUpload *Upload) uploadArtifacts(client piperHttp.Sender) error {
 		return fmt.Errorf("the nexus.Upload needs to be configured by calling SetArtifactsVersion() first")
 	}
 	if len(nexusUpload.artifacts) == 0 {
-		return fmt.Errorf("no artifacts to upload, call AddArtifact() or AddArtifactsFromJSON() first")
+		return fmt.Errorf("no artifacts to upload, call AddArtifact() first")
 	}
 
 	nexusUpload.initLogger()
@@ -175,6 +169,19 @@ func (nexusUpload *Upload) createHTTPClient() *piperHttp.Client {
 }
 
 func getBaseURL(nexusURL, nexusVersion, repository, groupID string) (string, error) {
+	if nexusURL == "" {
+		return "", errors.New("nexusURL must not be empty")
+	}
+	nexusURL = strings.ToLower(nexusURL)
+	if strings.HasPrefix(nexusURL, "http://") || strings.HasPrefix(nexusURL, "https://") {
+		return "", errors.New("nexusURL must not start with 'http://' or 'https://'")
+	}
+	if repository == "" {
+		return "", errors.New("repository must not be empty")
+	}
+	if groupID == "" {
+		return "", errors.New("groupID must not be empty")
+	}
 	baseURL := nexusURL
 	switch nexusVersion {
 	case "nexus2":
