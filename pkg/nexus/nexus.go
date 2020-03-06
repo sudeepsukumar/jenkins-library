@@ -58,9 +58,6 @@ func (nexusUpload *Upload) SetBaseURL(nexusURL, nexusVersion, repository, groupI
 	if nexusURL == "" {
 		return errors.New("nexusURL must not be empty")
 	}
-	if nexusVersion != "nexus2" && nexusVersion != "nexus3" {
-		return errors.New("nexusVersion must be one of 'nexus2' or 'nexus3'")
-	}
 	if repository == "" {
 		return errors.New("repository must not be empty")
 	}
@@ -185,7 +182,7 @@ func getBaseURL(nexusURL, nexusVersion, repository, groupID string) (string, err
 	case "nexus3":
 		baseURL += "/repository/"
 	default:
-		return "", fmt.Errorf("unsupported Nexus version '%s'", nexusVersion)
+		return "", fmt.Errorf("unsupported Nexus version '%s', must be 'nexus2' or 'nexus3'", nexusVersion)
 	}
 	groupPath := strings.ReplaceAll(groupID, ".", "/")
 	baseURL += repository + "/" + groupPath + "/"
