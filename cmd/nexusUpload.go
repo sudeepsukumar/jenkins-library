@@ -22,7 +22,6 @@ import (
 type projectStructure interface {
 	UsesMta() bool
 	UsesMaven() bool
-	UsesNpm() bool
 }
 
 type mavenExecutor struct {
@@ -39,14 +38,14 @@ func nexusUpload(options nexusUploadOptions, telemetryData *telemetry.CustomData
 	fileUtils := piperutils.Files{}
 	evaluator := mavenExecutor{execRunner: command.Command{}}
 
-	err := runNexusUpload(&options, &uploader, &projectStructure, &fileUtils, &evaluator, telemetryData)
+	err := runNexusUpload(&options, &uploader, &projectStructure, &fileUtils, &evaluator)
 	if err != nil {
 		log.Entry().WithError(err).Fatal("step execution failed")
 	}
 }
 
 func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, projectStructure projectStructure,
-	fileUtils piperutils.FileUtils, evaluator mavenEvaluator, telemetryData *telemetry.CustomData) error {
+	fileUtils piperutils.FileUtils, evaluator mavenEvaluator) error {
 
 	if projectStructure.UsesMta() {
 		log.Entry().Info("MTA project structure detected")
@@ -65,7 +64,7 @@ func uploadMTA(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options 
 	}
 	err := uploader.SetBaseURL(options.Url, options.Version, options.Repository, options.GroupID)
 	if err == nil {
-		exists, _ := piperutils.FileExists("mta.yaml")
+		exists, _ := fileUtils.FileExists("mta.yaml")
 		if exists {
 			// Give this file precedence, but it would be even better if
 			// ProjectStructure could be asked for the mta file it detected.
@@ -79,12 +78,13 @@ func uploadMTA(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options 
 		artifactID := options.ArtifactID
 		if artifactID == "" {
 			artifactID = piperenv.GetParameter(".pipeline/commonPipelineEnvironment/configuration", "artifactId")
+			log.Entry().Debugf("mtar artifact id from CPE: '%s'", artifactID)
 		}
 		err = uploader.AddArtifact(nexus.ArtifactDescription{File: "mta.yaml", Type: "yaml", Classifier: "", ID: options.ArtifactID})
 	}
 	if err == nil {
 		mtarFilePath := piperenv.GetParameter(".pipeline/commonPipelineEnvironment", "mtarFilePath")
-		fmt.Println(mtarFilePath)
+		log.Entry().Debugf("mtar file path: '%s'", mtarFilePath)
 		err = uploader.AddArtifact(nexus.ArtifactDescription{File: mtarFilePath, Type: "mtar", Classifier: "", ID: options.ArtifactID})
 	}
 	if err == nil {
