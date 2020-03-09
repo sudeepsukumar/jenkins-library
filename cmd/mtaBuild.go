@@ -200,8 +200,8 @@ func addNpmBinToPath(e execRunner) error {
 	if len(oldPath) > 0 {
 		newPath = newPath + ":" + oldPath
 	}
-	//os.Setenv("PATH", newPath)
-	e.SetEnv([]string{"PATH=" + newPath})
+	os.Setenv("PATH", newPath)
+	//e.SetEnv([]string{"PATH=" + newPath})
 	return nil
 }
 
