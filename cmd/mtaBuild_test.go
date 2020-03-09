@@ -1,14 +1,16 @@
 package cmd
 
 import (
+	"os"
+	"strings"
+	"testing"
+
 	piperhttp "github.com/SAP/jenkins-library/pkg/http"
 	"github.com/SAP/jenkins-library/pkg/maven"
 	"github.com/SAP/jenkins-library/pkg/mock"
 	"github.com/SAP/jenkins-library/pkg/piperutils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v2"
-	"os"
-	"testing"
 )
 
 func TestMarBuild(t *testing.T) {
@@ -289,6 +291,23 @@ func TestMarBuild(t *testing.T) {
 			assert.Equal(t, maven.ProjectSettingsFile, settingsFileType)
 		})
 	})
+}
+
+func TestAddNpmBinToPath(t *testing.T) {
+	e := mock.ExecMockRunner{}
+
+	err := addNpmBinToPath(&e)
+
+	assert.Nil(t, err)
+	// count apperances of "PATH="
+	countPath := 0
+	for _, value := range e.Env {
+		if strings.HasPrefix(value, "PATH=") {
+			countPath++
+			assert.Contains(t, value, "./node_modules/.bin")
+			assert.LessOrEqual(t, countPath, 1, "Found more than one PATH definition!")
+		}
+	}
 }
 
 type MtaTestFileUtilsMock struct {
