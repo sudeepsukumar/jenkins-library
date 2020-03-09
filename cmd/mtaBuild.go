@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path"
+	"strings"
+	"text/template"
+	"time"
+
 	"github.com/SAP/jenkins-library/pkg/command"
 	piperhttp "github.com/SAP/jenkins-library/pkg/http"
 	"github.com/SAP/jenkins-library/pkg/log"
@@ -11,10 +17,6 @@ import (
 	"github.com/SAP/jenkins-library/pkg/piperutils"
 	"github.com/SAP/jenkins-library/pkg/telemetry"
 	"gopkg.in/yaml.v2"
-	"os"
-	"strings"
-	"text/template"
-	"time"
 )
 
 const templateMtaYml = `_schema-version: "3.1"
@@ -192,23 +194,14 @@ func getMarJarName(config mtaBuildOptions) string {
 }
 
 func addNpmBinToPath(e execRunner) error {
-	newPath := "./node_modules/.bin"
+	dir, _ := os.Getwd()
+	newPath := path.Join(dir, "node_modules", ".bin")
 	oldPath := os.Getenv("PATH")
 	if len(oldPath) > 0 {
 		newPath = newPath + ":" + oldPath
 	}
-	replaced := false
-	newEnv := os.Environ()
-	for key, value := range newEnv {
-		if strings.HasPrefix(value, "PATH=") {
-			newEnv[key] = "PATH=" + newPath
-			replaced = true
-		}
-	}
-	if !replaced {
-		newEnv = append(newEnv, "PATH="+newPath)
-	}
-	e.SetEnv(newEnv)
+	//os.Setenv("PATH", newPath)
+	e.SetEnv([]string{"PATH=" + newPath})
 	return nil
 }
 
