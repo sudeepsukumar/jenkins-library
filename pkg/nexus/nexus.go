@@ -164,7 +164,7 @@ func (nexusUpload *Upload) createHTTPClient() *piperHttp.Client {
 		Username: nexusUpload.Username,
 		Password: nexusUpload.Password,
 		Logger:   nexusUpload.Logger,
-		Timeout:  3 * time.Minute,
+		Timeout:  10 * time.Minute,
 	}
 	client.SetOptions(clientOptions)
 	return &client
