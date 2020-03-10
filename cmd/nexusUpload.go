@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"fmt"
 
@@ -19,64 +20,107 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-type projectStructure interface {
-	UsesMta() bool
-	UsesMaven() bool
-}
-
-type mavenExecutor struct {
-	execRunner command.Command
-}
-
-type mavenEvaluator interface {
+// nexusUploadUtils defines an interface for utility functionality used from external packages,
+// so it can be easily mocked for testing.
+type nexusUploadUtils interface {
+	fileExists(path string) (bool, error)
+	fileRead(path string) ([]byte, error)
+	usesMta() bool
+	usesMaven() bool
+	getEnvParameter(path, name string) string
 	evaluateProperty(pomFile, expression string) (string, error)
 }
 
-func nexusUpload(options nexusUploadOptions, telemetryData *telemetry.CustomData) {
-	uploader := nexus.Upload{Username: options.User, Password: options.Password}
-	projectStructure := piperutils.ProjectStructure{}
-	fileUtils := piperutils.Files{}
-	evaluator := mavenExecutor{execRunner: command.Command{}}
+type utilsBundle struct {
+	projectStructure piperutils.ProjectStructure
+	fileUtils        piperutils.Files
+}
 
-	err := runNexusUpload(&options, &uploader, &projectStructure, &fileUtils, &evaluator)
+func newUtilsBundle() *utilsBundle {
+	return &utilsBundle{
+		projectStructure: piperutils.ProjectStructure{},
+		fileUtils:        piperutils.Files{},
+	}
+}
+
+func (u *utilsBundle) fileExists(path string) (bool, error) {
+	return u.fileUtils.FileExists(path)
+}
+
+func (u *utilsBundle) fileRead(path string) ([]byte, error) {
+	return u.fileUtils.FileRead(path)
+}
+
+func (u *utilsBundle) usesMta() bool {
+	return u.projectStructure.UsesMta()
+}
+
+func (u *utilsBundle) usesMaven() bool {
+	return u.projectStructure.UsesMaven()
+}
+
+func (u *utilsBundle) getEnvParameter(path, name string) string {
+	return piperenv.GetParameter(path, name)
+}
+
+func (u *utilsBundle) evaluateProperty(pomFile, expression string) (string, error) {
+	execRunner := command.Command{}
+	execRunner.Stdout(ioutil.Discard)
+	execRunner.Stderr(ioutil.Discard)
+
+	expressionDefine := "-Dexpression=" + expression
+
+	options := maven.ExecuteOptions{
+		PomPath:      pomFile,
+		Goals:        []string{"org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate"},
+		Defines:      []string{expressionDefine, "-DforceStdout", "-q"},
+		ReturnStdout: true,
+	}
+	value, err := maven.Execute(&options, &execRunner)
+	if err != nil {
+		return "", err
+	}
+	if strings.HasPrefix(value, "null object or invalid expression") {
+		return "", fmt.Errorf("expression '%s' in file '%s' could not be resolved", expression, pomFile)
+	}
+	log.Entry().Debugf("Evaluated expression '%s' in file '%s' as '%s'\n", expression, pomFile, value)
+	return value, nil
+}
+
+func nexusUpload(options nexusUploadOptions, _ *telemetry.CustomData) {
+	utils := newUtilsBundle()
+	uploader := nexus.Upload{
+		Username: options.User,
+		Password: options.Password,
+		Timeout:  30 * time.Second,
+	}
+
+	err := runNexusUpload(utils, &uploader, &options)
 	if err != nil {
 		log.Entry().WithError(err).Fatal("step execution failed")
 	}
 }
 
-func runNexusUpload(options *nexusUploadOptions, uploader nexus.Uploader, projectStructure projectStructure,
-	fileUtils piperutils.FileUtils, evaluator mavenEvaluator) error {
-
-	if projectStructure.UsesMta() {
+func runNexusUpload(utils nexusUploadUtils, uploader nexus.Uploader, options *nexusUploadOptions) error {
+	if utils.usesMta() {
 		log.Entry().Info("MTA project structure detected")
-		return uploadMTA(uploader, fileUtils, options)
-	} else if projectStructure.UsesMaven() {
+		return uploadMTA(utils, uploader, options)
+	} else if utils.usesMaven() {
 		log.Entry().Info("Maven project structure detected")
-		return uploadMaven(uploader, fileUtils, evaluator, options)
+		return uploadMaven(utils, uploader, options)
 	} else {
 		return fmt.Errorf("unsupported project structure")
 	}
 }
 
-func uploadMTA(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options *nexusUploadOptions) error {
+func uploadMTA(utils nexusUploadUtils, uploader nexus.Uploader, options *nexusUploadOptions) error {
 	if options.GroupID == "" {
-		return fmt.Errorf("the 'groupID' parameter needs to be provided for MTA projects")
+		return fmt.Errorf("the 'groupId' parameter needs to be provided for MTA projects")
 	}
 	err := uploader.SetBaseURL(options.Url, options.Version, options.Repository, options.GroupID)
-	if err == nil {
-		exists, _ := fileUtils.FileExists("mta.yaml")
-		if exists {
-			// Give this file precedence, but it would be even better if
-			// ProjectStructure could be asked for the mta file it detected.
-			err = setVersionFromMtaFile(uploader, fileUtils, "mta.yaml")
-		} else {
-			// This will fail anyway if the file doesn't exist
-			err = setVersionFromMtaFile(uploader, fileUtils, "mta.yml")
-		}
-	}
 	var mtaPath string
 	if err == nil {
-		exists, _ := fileUtils.FileExists("mta.yaml")
+		exists, _ := utils.fileExists("mta.yaml")
 		if exists {
 			mtaPath = "mta.yaml"
 			// Give this file precedence, but it would be even better if
@@ -85,20 +129,24 @@ func uploadMTA(uploader nexus.Uploader, fileUtils piperutils.FileUtils, options 
 			// This will fail anyway if the file doesn't exist
 			mtaPath = "mta.yml"
 		}
-		err = setVersionFromMtaFile(uploader, fileUtils, mtaPath)
+		err = setVersionFromMtaFile(utils, uploader, mtaPath)
 	}
-	if err == nil {
-		artifactID := options.ArtifactID
+	var artifactID = options.ArtifactID
+	if artifactID == "" {
+		artifactID = utils.getEnvParameter(".pipeline/commonPipelineEnvironment/configuration", "artifactId")
 		if artifactID == "" {
-			artifactID = piperenv.GetParameter(".pipeline/commonPipelineEnvironment/configuration", "artifactId")
+			err = fmt.Errorf("the 'artifactId' parameter was not provided and could not be retrieved from the Common Pipeline Environment")
+		} else {
 			log.Entry().Debugf("mtar artifact id from CPE: '%s'", artifactID)
 		}
-		err = uploader.AddArtifact(nexus.ArtifactDescription{File: mtaPath, Type: "yaml", Classifier: "", ID: options.ArtifactID})
 	}
 	if err == nil {
-		mtarFilePath := piperenv.GetParameter(".pipeline/commonPipelineEnvironment", "mtarFilePath")
+		err = addArtifact(utils, uploader, mtaPath, "", "yaml", artifactID)
+	}
+	if err == nil {
+		mtarFilePath := utils.getEnvParameter(".pipeline/commonPipelineEnvironment", "mtarFilePath")
 		log.Entry().Debugf("mtar file path: '%s'", mtarFilePath)
-		err = uploader.AddArtifact(nexus.ArtifactDescription{File: mtarFilePath, Type: "mtar", Classifier: "", ID: options.ArtifactID})
+		err = addArtifact(utils, uploader, mtarFilePath, "", "mtar", artifactID)
 	}
 	if err == nil {
 		err = uploader.UploadArtifacts()
@@ -111,8 +159,8 @@ type mtaYaml struct {
 	Version string `json:"version"`
 }
 
-func setVersionFromMtaFile(uploader nexus.Uploader, fileUtils piperutils.FileUtils, filePath string) error {
-	mtaYamlContent, err := fileUtils.FileRead(filePath)
+func setVersionFromMtaFile(utils nexusUploadUtils, uploader nexus.Uploader, filePath string) error {
+	mtaYamlContent, err := utils.fileRead(filePath)
 	if err != nil {
 		return err
 	}
@@ -128,12 +176,10 @@ func setVersionFromMtaYaml(uploader nexus.Uploader, mtaYamlContent []byte) error
 	return uploader.SetArtifactsVersion(mtaYaml.Version)
 }
 
-var errPomNotFound error = errors.New("pom.xml not found")
+var errPomNotFound = errors.New("pom.xml not found")
 
-func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, evaluator mavenEvaluator,
-	options *nexusUploadOptions) error {
-	err := uploadMavenArtifacts(uploader, fileUtils, evaluator, options,
-		"", "target", "")
+func uploadMaven(utils nexusUploadUtils, uploader nexus.Uploader, options *nexusUploadOptions) error {
+	err := uploadMavenArtifacts(utils, uploader, options, "", "target", "")
 	if err != nil {
 		return err
 	}
@@ -141,8 +187,8 @@ func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, evalua
 	// Test if a sub-folder "application" exists and upload the artifacts from there as well.
 	// This means there are built-in assumptions about the project structure (archetype),
 	// that nexusUpload supports. To make this more flexible should be the scope of another PR.
-	err = uploadMavenArtifacts(uploader, fileUtils, evaluator, options,
-		"application", "application/target", options.AdditionalClassifiers)
+	err = uploadMavenArtifacts(utils, uploader, options, "application", "application/target",
+		options.AdditionalClassifiers)
 	if err == errPomNotFound {
 		// Ignore for missing application module
 		return nil
@@ -150,16 +196,16 @@ func uploadMaven(uploader nexus.Uploader, fileUtils piperutils.FileUtils, evalua
 	return err
 }
 
-func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtils, evaluator mavenEvaluator,
-	options *nexusUploadOptions, pomPath, targetFolder, additionalClassifiers string) error {
+func uploadMavenArtifacts(utils nexusUploadUtils, uploader nexus.Uploader, options *nexusUploadOptions,
+	pomPath, targetFolder, additionalClassifiers string) error {
 	var err error
 
 	pomFile := composeFilePath(pomPath, "pom", "xml")
-	exists, _ := fileUtils.FileExists(pomFile)
+	exists, _ := utils.fileExists(pomFile)
 	if !exists {
 		return errPomNotFound
 	}
-	groupID, err := evaluator.evaluateProperty(pomFile, "project.groupId")
+	groupID, err := utils.evaluateProperty(pomFile, "project.groupId")
 	if groupID == "" {
 		groupID = options.GroupID
 		// Reset error
@@ -170,29 +216,23 @@ func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtil
 	}
 	var artifactID string
 	if err == nil {
-		artifactID, err = evaluator.evaluateProperty(pomFile, "project.artifactId")
+		artifactID, err = utils.evaluateProperty(pomFile, "project.artifactId")
 	}
 	var artifactsVersion string
 	if err == nil {
-		artifactsVersion, err = evaluator.evaluateProperty(pomFile, "project.version")
+		artifactsVersion, err = utils.evaluateProperty(pomFile, "project.version")
 	}
 	if err == nil {
 		err = uploader.SetArtifactsVersion(artifactsVersion)
 	}
 	if err == nil {
-		artifact := nexus.ArtifactDescription{
-			File:       pomFile,
-			Type:       "pom",
-			Classifier: "",
-			ID:         artifactID,
-		}
-		err = uploader.AddArtifact(artifact)
+		err = addArtifact(utils, uploader, pomFile, "", "pom", artifactID)
 	}
 	if err == nil {
-		err = addTargetArtifact(pomFile, targetFolder, artifactID, uploader, evaluator)
+		err = addTargetArtifact(utils, uploader, pomFile, targetFolder, artifactID)
 	}
 	if err == nil {
-		err = addAdditionalClassifierArtifacts(additionalClassifiers, targetFolder, artifactID, uploader)
+		err = addAdditionalClassifierArtifacts(utils, uploader, additionalClassifiers, targetFolder, artifactID)
 	}
 	if err == nil {
 		err = uploader.UploadArtifacts()
@@ -200,8 +240,8 @@ func uploadMavenArtifacts(uploader nexus.Uploader, fileUtils piperutils.FileUtil
 	return err
 }
 
-func addTargetArtifact(pomFile, targetFolder, artifactID string, uploader nexus.Uploader, evaluator mavenEvaluator) error {
-	packaging, err := evaluator.evaluateProperty(pomFile, "project.packaging")
+func addTargetArtifact(utils nexusUploadUtils, uploader nexus.Uploader, pomFile, targetFolder, artifactID string) error {
+	packaging, err := utils.evaluateProperty(pomFile, "project.packaging")
 	if err != nil {
 		return err
 	}
@@ -212,23 +252,18 @@ func addTargetArtifact(pomFile, targetFolder, artifactID string, uploader nexus.
 	if packaging == "" {
 		packaging = "jar"
 	}
-	finalName, err := evaluator.evaluateProperty(pomFile, "project.build.finalName")
+	finalName, err := utils.evaluateProperty(pomFile, "project.build.finalName")
 	if err != nil || finalName == "" {
 		// NOTE: The error should be ignored, and the finalName built as Maven would from artifactId and so on.
 		// But it seems this expression always resolves, even if finalName is nowhere declared in the pom.xml
 		return err
 	}
 	filePath := composeFilePath(targetFolder, finalName, packaging)
-	artifact := nexus.ArtifactDescription{
-		File:       filePath,
-		Type:       packaging,
-		Classifier: "",
-		ID:         artifactID,
-	}
-	return uploader.AddArtifact(artifact)
+	return addArtifact(utils, uploader, filePath, "", packaging, artifactID)
 }
 
-func addAdditionalClassifierArtifacts(additionalClassifiers, targetFolder, artifactID string, uploader nexus.Uploader) error {
+func addAdditionalClassifierArtifacts(utils nexusUploadUtils, uploader nexus.Uploader,
+	additionalClassifiers, targetFolder, artifactID string) error {
 	if additionalClassifiers == "" {
 		return nil
 	}
@@ -242,13 +277,7 @@ func addAdditionalClassifierArtifacts(additionalClassifiers, targetFolder, artif
 				classifier.Classifier, classifier.FileType)
 		}
 		filePath := composeFilePath(targetFolder, artifactID+"-"+classifier.Classifier, classifier.FileType)
-		artifact := nexus.ArtifactDescription{
-			File:       filePath,
-			Type:       classifier.FileType,
-			Classifier: classifier.Classifier,
-			ID:         artifactID,
-		}
-		err = uploader.AddArtifact(artifact)
+		err = addArtifact(utils, uploader, filePath, classifier.FileType, classifier.Classifier, artifactID)
 		if err != nil {
 			return err
 		}
@@ -261,27 +290,18 @@ func composeFilePath(folder, name, extension string) string {
 	return filepath.Join(folder, fileName)
 }
 
-func (m *mavenExecutor) evaluateProperty(pomFile, expression string) (string, error) {
-	m.execRunner.Stdout(ioutil.Discard)
-	m.execRunner.Stderr(ioutil.Discard)
-
-	expressionDefine := "-Dexpression=" + expression
-
-	options := maven.ExecuteOptions{
-		PomPath:      pomFile,
-		Goals:        []string{"org.apache.maven.plugins:maven-help-plugin:3.1.0:evaluate"},
-		Defines:      []string{expressionDefine, "-DforceStdout", "-q"},
-		ReturnStdout: true,
+func addArtifact(utils nexusUploadUtils, uploader nexus.Uploader, filePath, classifier, fileType, id string) error {
+	exists, _ := utils.fileExists(filePath)
+	if !exists {
+		return fmt.Errorf("artifact file not found '%s'", filePath)
 	}
-	value, err := maven.Execute(&options, &m.execRunner)
-	if err != nil {
-		return "", err
+	artifact := nexus.ArtifactDescription{
+		File:       filePath,
+		Type:       fileType,
+		Classifier: classifier,
+		ID:         id,
 	}
-	if strings.HasPrefix(value, "null object or invalid expression") {
-		return "", fmt.Errorf("expression '%s' in file '%s' could not be resolved", expression, pomFile)
-	}
-	log.Entry().Debugf("Evaluated expression '%s' in file '%s' as '%s'\n", expression, pomFile, value)
-	return value, nil
+	return uploader.AddArtifact(artifact)
 }
 
 type classifierDescription struct {

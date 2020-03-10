@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	piperHttp "github.com/SAP/jenkins-library/pkg/http"
 	"github.com/SAP/jenkins-library/pkg/log"
@@ -35,6 +36,7 @@ type Upload struct {
 	Password  string
 	artifacts []ArtifactDescription
 	Logger    *logrus.Entry
+	Timeout   time.Duration
 }
 
 // Uploader provides an interface to the nexus upload for configuring the target Nexus Repository and
@@ -49,7 +51,7 @@ type Uploader interface {
 
 func (nexusUpload *Upload) initLogger() {
 	if nexusUpload.Logger == nil {
-		nexusUpload.Logger = log.Entry().WithField("package", "SAP/jenkins-library/pkg/nexusUpload")
+		nexusUpload.Logger = log.Entry().WithField("package", "SAP/jenkins-library/pkg/nexus")
 	}
 }
 
@@ -163,6 +165,7 @@ func (nexusUpload *Upload) createHTTPClient() *piperHttp.Client {
 		Username: nexusUpload.Username,
 		Password: nexusUpload.Password,
 		Logger:   nexusUpload.Logger,
+		Timeout:  nexusUpload.Timeout,
 	}
 	client.SetOptions(clientOptions)
 	return &client

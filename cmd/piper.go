@@ -59,6 +59,7 @@ func Execute() {
 	rootCmd.AddCommand(MtaBuildCommand())
 	rootCmd.AddCommand(ProtecodeExecuteScanCommand())
 	rootCmd.AddCommand(MavenExecuteCommand())
+	rootCmd.AddCommand(MavenStaticCodeChecksCommand())
 	rootCmd.AddCommand(NexusUploadCommand())
 
 	addRootFlags(rootCmd)
