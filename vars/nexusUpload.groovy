@@ -34,7 +34,7 @@ void call(Map parameters = [:]) {
         }
         parameters.remove('credentialsId')
 
-        if (!fileExists('./piper') {
+        if (!fileExists('./piper')) {
             new PiperGoUtils(this, utils).unstashPiperBin()
         }
         utils.unstash('pipelineConfigAndTests')
