@@ -33,6 +33,13 @@ void call(Map parameters = [:]) {
             parameters.nexusCredentialsId = parameters.credentialsId
         }
         parameters.remove('credentialsId')
+        // Remove empty credentials, since the will end up as "net.sf.json.JSONNull"
+        // when reading back the config via "piper getConfig --contextConfig" and
+        // that in turn will trigger the withCredentials() code-path, but fail to
+        // create a binding.
+        if (!parameters.nexusCredentialsId) {
+            parameters.remove('nexusCredentialsId')
+        }
 
         if (!fileExists('./piper')) {
             new PiperGoUtils(this, utils).unstashPiperBin()
