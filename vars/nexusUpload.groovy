@@ -34,7 +34,9 @@ void call(Map parameters = [:]) {
         }
         parameters.remove('credentialsId')
 
-        new PiperGoUtils(this, utils).unstashPiperBin()
+        if (!fileExists('./piper') {
+            new PiperGoUtils(this, utils).unstashPiperBin()
+        }
         utils.unstash('pipelineConfigAndTests')
         script.commonPipelineEnvironment.writeToDisk(script)
 
