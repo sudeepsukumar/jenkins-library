@@ -304,10 +304,11 @@ func TestAddNpmBinToPath(t *testing.T) {
 	for _, value := range e.Env {
 		if strings.HasPrefix(value, "PATH=") {
 			countPath++
-			assert.Contains(t, value, "./node_modules/.bin")
+			assert.Contains(t, value, "/node_modules/.bin")
 			assert.LessOrEqual(t, countPath, 1, "Found more than one PATH definition!")
 		}
 	}
+	assert.Contains(t, os.Getenv("PATH"), "/node_modules/.bin")
 }
 
 type MtaTestFileUtilsMock struct {
