@@ -128,8 +128,8 @@ void call(Map parameters = [:]) {
                         loadSonarScanner(config)
 
                         if(fileExists('.certificates/cacerts')){
-                            config.options.add("javax.net.ssl.trustStore='.certificates/cacerts'")
-                            config.options.add("javax.net.ssl.trustStorePassword='changeit'")
+                            config.options.add('javax.net.ssl.trustStore="$PWD/.certificates/cacerts"')
+                            config.options.add('javax.net.ssl.trustStorePassword="changeit"')
                         }
                         if(config.organization)
                             config.options.add("sonar.organization=${config.organization}")
