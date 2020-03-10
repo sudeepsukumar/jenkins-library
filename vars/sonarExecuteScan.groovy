@@ -127,9 +127,9 @@ void call(Map parameters = [:]) {
 
                         loadSonarScanner(config)
 
-                        if(fileExists('.certificates/cacerts')){
-                            sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
-                        }
+                        //if(fileExists('.certificates/cacerts')){
+                        //    sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
+                        //}
 
                         if(config.organization) config.options.add("sonar.organization=${config.organization}")
                         if(config.projectVersion) config.options.add("sonar.projectVersion=${config.projectVersion}")
