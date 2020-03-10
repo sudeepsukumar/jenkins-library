@@ -130,6 +130,7 @@ void call(Map parameters = [:]) {
                         if(fileExists('.certificates/cacerts')){
                             config.options.add('javax.net.ssl.trustStore="$PWD/.certificates/cacerts"')
                             config.options.add('javax.net.ssl.trustStorePassword="changeit"')
+                            config.options.add('javax.net.debug=ssl')
                         }
                         if(config.organization)
                             config.options.add("sonar.organization=${config.organization}")
