@@ -127,12 +127,12 @@ void call(Map parameters = [:]) {
 
                         loadSonarScanner(config)
 
-                        //if(fileExists('.certificates/cacerts')){
-                        //    sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
-                        //}
-
-                        if(config.organization) config.options.add("sonar.organization=${config.organization}")
-                        if(config.projectVersion) config.options.add("sonar.projectVersion=${config.projectVersion}")
+                        if(fileExists('.certificates/cacerts'))
+                            config.options.add("javax.net.ssl.trustStore='.certificates/cacerts'")
+                        if(config.organization)
+                            config.options.add("sonar.organization=${config.organization}")
+                        if(config.projectVersion)
+                            config.options.add("sonar.projectVersion=${config.projectVersion}")
                         // prefix options
                         config.options = config.options.collect { it.startsWith('-D') ? it : "-D${it}" }
 
