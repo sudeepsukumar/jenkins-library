@@ -130,8 +130,8 @@ void call(Map parameters = [:]) {
                         if(fileExists('.certificates/cacerts')){
                             //config.options.add("javax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts")
                             //config.options.add("javax.net.ssl.trustStorePassword=changeit")
-                            sh "export SONAR_SCANNER_OPTS='-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
-                            sh "export JAVA_OPTIONS='-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
+                            //sh "export SONAR_SCANNER_OPTS='-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
+                            //sh "export JAVA_OPTIONS='-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
                             //sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
                         }
 
@@ -140,7 +140,7 @@ void call(Map parameters = [:]) {
                         // prefix options
                         config.options = config.options.collect { it.startsWith('-D') ? it : "-D${it}" }
                         withEnv([
-                            "SONAR_SCANNER_OPTS=-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
+                            "SONAR_SCANNER_OPTS=-Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
                         ]){
                             sh "printenv"
                             sh "PATH=\$PATH:'${env.WORKSPACE}/.sonar-scanner/bin' sonar-scanner -X ${config.options.join(' ')}"
