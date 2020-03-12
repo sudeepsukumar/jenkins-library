@@ -139,6 +139,7 @@ void call(Map parameters = [:]) {
                         // prefix options
                         config.options = config.options.collect { it.startsWith('-D') ? it : "-D${it}" }
 
+                        sh "printenv"
                         sh "PATH=\$PATH:'${env.WORKSPACE}/.sonar-scanner/bin' sonar-scanner -X ${config.options.join(' ')}"
                 }
             } finally {
