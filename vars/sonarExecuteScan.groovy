@@ -128,7 +128,9 @@ void call(Map parameters = [:]) {
                         loadSonarScanner(config)
 
                         if(fileExists('.certificates/cacerts')){
-                            sh "export JAVA_OPTIONS='-Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
+                            config.options.add("javax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts")
+                            config.options.add("javax.net.ssl.trustStorePassword=changeit")
+                            //sh "export JAVA_OPTIONS='-Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
                             //sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
                         }
 
