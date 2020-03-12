@@ -124,7 +124,7 @@ void call(Map parameters = [:]) {
         def worker = { config ->
             try {
                 withSonarQubeEnv(config.instance) {
-                    def envVars = []
+                    List envVars = []
 
                     loadSonarScanner(config)
 
