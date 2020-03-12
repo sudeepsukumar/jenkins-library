@@ -124,30 +124,26 @@ void call(Map parameters = [:]) {
         def worker = { config ->
             try {
                 withSonarQubeEnv(config.instance) {
+                    def envVars = []
 
-                        loadSonarScanner(config)
+                    loadSonarScanner(config)
 
-                        if(fileExists('.certificates/cacerts')){
-                            //config.options.add("javax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts")
-                            //config.options.add("javax.net.ssl.trustStorePassword=changeit")
-                            //sh "export SONAR_SCANNER_OPTS='-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
-                            //sh "export JAVA_OPTIONS='-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
-                            //sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
-                        }
+                    if(fileExists('.certificates/cacerts')){
+                        //-Djavax.net.ssl.trustStorePassword=changeit
+                        envVars.plus("SONAR_SCANNER_OPTS=-Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts")
+                    }
 
-                        if(config.organization) config.options.add("sonar.organization=${config.organization}")
-                        if(config.projectVersion) config.options.add("sonar.projectVersion=${config.projectVersion}")
-                        // prefix options
-                        config.options = config.options.collect { it.startsWith('-D') ? it : "-D${it}" }
-                        withEnv([
-                            "SONAR_SCANNER_OPTS=-Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
-                        ]){
-                            sh "printenv"
-                            sh "PATH=\$PATH:'${env.WORKSPACE}/.sonar-scanner/bin' sonar-scanner -X ${config.options.join(' ')}"
-                        }
+                    if(config.organization) config.options.add("sonar.organization=${config.organization}")
+                    if(config.projectVersion) config.options.add("sonar.projectVersion=${config.projectVersion}")
+                    // prefix options
+                    config.options = config.options.collect { it.startsWith('-D') ? it : "-D${it}" }
+                    withEnv(envVars){
+                        sh "printenv"
+                        sh "PATH=\$PATH:'${env.WORKSPACE}/.sonar-scanner/bin' sonar-scanner ${config.options.join(' ')}"
+                    }
                 }
             } finally {
-                //sh 'rm -rf .sonar-scanner .certificates .scannerwork'
+                sh 'rm -rf .sonar-scanner .certificates .scannerwork'
             }
         }
 
