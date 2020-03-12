@@ -128,7 +128,8 @@ void call(Map parameters = [:]) {
                         loadSonarScanner(config)
 
                         if(fileExists('.certificates/cacerts')){
-                            sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
+                            sh "export JAVA_OPTION='-Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
+                            //sh 'mv .certificates/cacerts .sonar-scanner/jre/lib/security/cacerts'
                         }
 
                         if(config.organization) config.options.add("sonar.organization=${config.organization}")
@@ -136,7 +137,7 @@ void call(Map parameters = [:]) {
                         // prefix options
                         config.options = config.options.collect { it.startsWith('-D') ? it : "-D${it}" }
 
-                        sh "PATH=\$PATH:'${env.WORKSPACE}/.sonar-scanner/bin' sonar-scanner ${config.options.join(' ')}"
+                        sh "PATH=\$PATH:'${env.WORKSPACE}/.sonar-scanner/bin' sonar-scanner -X ${config.options.join(' ')}"
                 }
             } finally {
                 //sh 'rm -rf .sonar-scanner .certificates .scannerwork'
