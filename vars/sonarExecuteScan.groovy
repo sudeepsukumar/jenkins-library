@@ -140,7 +140,7 @@ void call(Map parameters = [:]) {
                         // prefix options
                         config.options = config.options.collect { it.startsWith('-D') ? it : "-D${it}" }
                         withEnv([
-                            "SONAR_SCANNER_OPTS='-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit'"
+                            "SONAR_SCANNER_OPTS=-Djavax.net.debug=all -Djavax.net.ssl.trustStore=${env.WORKSPACE}/.certificates/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
                         ]){
                             sh "printenv"
                             sh "PATH=\$PATH:'${env.WORKSPACE}/.sonar-scanner/bin' sonar-scanner -X ${config.options.join(' ')}"
