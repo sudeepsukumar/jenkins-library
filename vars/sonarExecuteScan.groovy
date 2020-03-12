@@ -209,6 +209,13 @@ private Boolean isPullRequest(){
 }
 
 private void loadSonarScanner(config){
+    String status = sh script: 'which sonar-scanner', returnStatus: true
+    if (status == "0") {
+        echo "Sonar scanner found in PATH."
+        return
+    } else {
+        echo "Sonar scanner not found in PATH, downloading.."
+    }
     def filename = new File(config.sonarScannerDownloadUrl).getName()
     def foldername = filename.replace('.zip', '').replace('cli-', '')
 
