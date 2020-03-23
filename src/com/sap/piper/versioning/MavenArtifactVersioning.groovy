@@ -16,6 +16,8 @@ class MavenArtifactVersioning extends ArtifactVersioning {
 
     @Override
     def setVersion(version) {
+        script.sh "ls -la"
         script.mavenExecute script: script, goals: 'versions:set', defines: "-DnewVersion=${version} -DgenerateBackupPoms=false", pomPath: configuration.filePath
+        script.sh "ls -la"
     }
 }
