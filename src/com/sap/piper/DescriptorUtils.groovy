@@ -14,6 +14,7 @@ def version = Pattern.compile("(.*)version=['\"](.*?)['\"](.*)", Pattern.DOTALL)
 def method = Pattern.compile("(.*)\\(\\)", Pattern.DOTALL)
 
 def getMavenGAV(file = 'pom.xml') {
+    sh 'echo begin getMavenGAV; ls -la'
     def result = [:]
     def descriptor = readMavenPom(file: file)
     def group = descriptor.getGroupId()
@@ -24,6 +25,7 @@ def getMavenGAV(file = 'pom.xml') {
     result['artifact'] = (null != artifact && artifact.length() > 0) ? artifact : sh(returnStdout: true, script: "mvn -f ${file} help:evaluate -Dexpression=project.artifactId | grep -Ev '(^\\s*\\[|Download|Java\\w+:)'").trim()
     result['version'] = (null != version && version.length() > 0) ? version : sh(returnStdout: true, script: "mvn -f ${file} help:evaluate -Dexpression=project.version | grep ^[0-9].*").trim()
     echo "loaded ${result} from ${file}"
+    sh 'echo end getMavenGAV; ls -la'
     return result
 }
 
