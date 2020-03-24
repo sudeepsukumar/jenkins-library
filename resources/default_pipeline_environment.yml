@@ -338,6 +338,7 @@ steps:
     dockerImage: 'maven:3.5-jdk-7'
     logSuccessfulMavenTransfers: false
     m2Path: /tmp/m2
+    flags: "-X"
   mtaBuild:
     buildTarget: 'NEO'
     mtaBuildTool: cloudMbt
