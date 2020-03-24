@@ -337,7 +337,7 @@ steps:
   mavenExecute:
     dockerImage: 'maven:3.5-jdk-7'
     logSuccessfulMavenTransfers: false
-    m2Path: /tmp/m2
+    defines: -Duser.home=/tmp
     flags: "-X"
   mtaBuild:
     buildTarget: 'NEO'
