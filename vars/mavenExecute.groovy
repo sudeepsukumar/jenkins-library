@@ -125,6 +125,8 @@ def call(Map parameters = [:]) {
             command += " ${defines}"
         }
 
+        command += ' -Duser.home=/tmp'
+
         dockerExecute(script: script, dockerImage: configuration.dockerImage, dockerOptions: configuration.dockerOptions) {
             if (configuration.returnStdout) {
                 commandOutput = sh(returnStdout: true, script: command)
