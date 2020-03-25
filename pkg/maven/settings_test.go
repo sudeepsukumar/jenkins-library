@@ -146,6 +146,10 @@ func (c *httpMock) DownloadFile(url, filename string, header http.Header, cookie
 	return nil
 }
 
+func (m * httpMock) DownloadFileIfURL(path, fileName string) (string, error) {
+	return "", nil
+}
+
 type fileUtilsMock struct {
 	existingFiles map[string]string
 	writtenFiles  map[string]string

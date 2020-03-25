@@ -6,17 +6,32 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 //Downloader ...
 type Downloader interface {
 	SetOptions(options ClientOptions)
 	DownloadFile(url, filename string, header http.Header, cookies []*http.Cookie) error
+	DownloadFileIfURL(path, fileName string) (string, error)
 }
 
 // DownloadFile downloads a file's content as GET request from the specified URL to the specified file
 func (c *Client) DownloadFile(url, filename string, header http.Header, cookies []*http.Cookie) error {
 	return c.DownloadRequest(http.MethodGet, url, filename, header, cookies)
+}
+
+// DownloadFileIfURL downloads a file if a given path begins with http or https otherwise it returns the given path
+func (c *Client) DownloadFileIfURL(path, fileName string) (string, error) {
+	result := path
+	if strings.HasPrefix(path, "http:") || strings.HasPrefix(path, "https:") {
+		err := c.DownloadFile(path, fileName, nil, nil)
+		if err != nil {
+			return "", err
+		}
+		result = fileName
+	}
+	return result, nil
 }
 
 // DownloadRequest ...

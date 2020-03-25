@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/SAP/jenkins-library/pkg/http"
 	"strings"
 
 	"github.com/SAP/jenkins-library/pkg/command"
@@ -61,11 +62,19 @@ func runMavenStaticCodeChecks(config *mavenExecuteStaticCodeChecksOptions, telem
 
 func getSpotBugsMavenParameters(config *mavenExecuteStaticCodeChecksOptions) *maven.ExecuteOptions {
 	var defines []string
+	client := &http.Client{}
+
 	if config.SpotBugsIncludeFilterFile != "" {
-		defines = append(defines, "-Dspotbugs.includeFilterFile="+config.SpotBugsIncludeFilterFile)
+		includeFilterFile, err := client.DownloadFileIfURL(config.SpotBugsIncludeFilterFile, "spotBugsIncludeFilter.xml")
+		if err == nil {
+			defines = append(defines, "-Dspotbugs.includeFilterFile="+includeFilterFile)
+		}
 	}
 	if config.SpotBugsExcludeFilterFile != "" {
-		defines = append(defines, "-Dspotbugs.excludeFilterFile="+config.SpotBugsExcludeFilterFile)
+		excludeFilterFile, err := client.DownloadFileIfURL(config.SpotBugsExcludeFilterFile, "spotBugsExcludeFilter.xml")
+		if err == nil {
+			defines = append(defines, "-Dspotbugs.excludeFilterFile="+excludeFilterFile)
+		}
 	}
 
 	mavenOptions := maven.ExecuteOptions{

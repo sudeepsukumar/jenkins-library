@@ -31,6 +31,15 @@ func (m *mockDownloader) DownloadFile(url, filename string, header http.Header, 
 	return nil
 }
 
+func (m * mockDownloader) DownloadFileIfURL(path, fileName string) (string, error) {
+	m.requestedURL = append(m.requestedURL, path)
+	m.requestedFile = append(m.requestedFile, fileName)
+	if m.shouldFail {
+		return "", errors.New("something happened")
+	}
+	return fileName, nil
+}
+
 func (m *mockDownloader) SetOptions(options piperHttp.ClientOptions) {}
 
 func mockFileUtilsExists(exists bool) func(string) (bool, error) {
