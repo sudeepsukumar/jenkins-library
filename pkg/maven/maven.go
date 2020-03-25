@@ -89,18 +89,6 @@ func evaluateStdOut(config *ExecuteOptions) (*bytes.Buffer, io.Writer) {
 	return stdOutBuf, stdOut
 }
 
-//func downloadSettingsIfURL(settingsFileOption, settingsFile string, client http.Downloader) (string, error) {
-//	result := settingsFileOption
-//	if strings.HasPrefix(settingsFileOption, "http:") || strings.HasPrefix(settingsFileOption, "https:") {
-//		err := downloadSettingsFromURL(settingsFileOption, settingsFile, client)
-//		if err != nil {
-//			return "", err
-//		}
-//		result = settingsFile
-//	}
-//	return result, nil
-//}
-
 func getParametersFromOptions(options *ExecuteOptions, client http.Downloader) ([]string, error) {
 	var parameters []string
 
@@ -145,16 +133,6 @@ func getParametersFromOptions(options *ExecuteOptions, client http.Downloader) (
 	parameters = append(parameters, options.Goals...)
 	return parameters, nil
 }
-
-//// ToDo replace with pkg/maven/settings GetSettingsFile
-//func downloadSettingsFromURL(url, filename string, client http.Downloader) error {
-//	err := client.DownloadFile(url, filename, nil, nil)
-//	if err != nil {
-//		return fmt.Errorf("failed to download maven settings from URL '%s' to file '%s': %w",
-//			url, filename, err)
-//	}
-//	return nil
-//}
 
 func GetTestModulesExcludes() []string {
 	var excludes []string

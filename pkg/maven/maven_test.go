@@ -128,19 +128,6 @@ func TestGetParameters(t *testing.T) {
 	})
 }
 
-//func TestDownloadSettingsFromURL(t *testing.T) {
-//	t.Run("should pass if download is successful", func(t *testing.T) {
-//		mockClient := mockDownloader{shouldFail: false}
-//		err := downloadSettingsFromURL("anyURL", "settings.xml", &mockClient)
-//		assert.NoError(t, err)
-//	})
-//	t.Run("should fail if download fails", func(t *testing.T) {
-//		mockClient := mockDownloader{shouldFail: true}
-//		err := downloadSettingsFromURL("anyURL", "settings.xml", &mockClient)
-//		assert.EqualError(t, err, "failed to download maven settings from URL 'anyURL' to file 'settings.xml': something happened")
-//	})
-//}
-
 func TestGetTestModulesExcludes(t *testing.T) {
 	t.Run("Should return excludes for unit- and integration-tests", func(t *testing.T) {
 		currentDir, err := os.Getwd()
