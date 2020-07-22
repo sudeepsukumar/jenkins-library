@@ -33,7 +33,7 @@ class CloudFoundry {
         script.withCredentials([script.usernamePassword(credentialsId: credentialsId, usernameVariable: 'usercf', passwordVariable: 'passwordcf')]) {
             def token = script.httpRequest url:"${authorizationEndpoint}/oauth/token", quiet: !verbose,
                                 httpMode:'POST',
-                                requestBody: "username=${script.usercf}&password=${script.passwordcf}&client_id=cf&grant_type=password&response_type=token",
+                                requestBody: "username=" + script.usercf + "&password=" + script.passwordcf + "&client_id=cf&grant_type=password&response_type=token",
                                 customHeaders: [[name: 'Content-Type', value: 'application/x-www-form-urlencoded'],[name: 'Authorization', value: 'Basic Y2Y6']]
             def responseJson = script.readJSON text:"${token.content}"
             return "Bearer ${responseJson.access_token.trim()}"
